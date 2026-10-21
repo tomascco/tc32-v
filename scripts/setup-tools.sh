@@ -102,6 +102,12 @@ check_host() {
     # The `verilator` executable is a Perl script.
     command -v perl >/dev/null 2>&1 ||
         die "'perl' not found on the PATH (Verilator needs it)."
+    # RHEL/Rocky 9 ship FindBin in a separate package (perl-FindBin). Without
+    # it, use the stand-in in scripts/perl5/ (the Makefile does the same).
+    if ! perl -MFindBin -e1 2>/dev/null; then
+        export PERL5LIB="$REPO_ROOT/scripts/perl5${PERL5LIB:+:$PERL5LIB}"
+        info "perl:      FindBin missing; using scripts/perl5/FindBin.pm"
+    fi
     command -v sha256sum >/dev/null 2>&1 ||
         die "'sha256sum' not found on the PATH."
 
@@ -192,13 +198,20 @@ module smoke_tb;
     end
 endmodule
 EOF
+    # Verilator always links with -latomic. Without the libatomic package
+    # (RHEL/Rocky 9, no root) drop it; x86-64 does not need it (the Makefile
+    # does the same).
+    local makeflags=(-MAKEFLAGS "CXX=$CXX" -MAKEFLAGS "LINK=$CXX"
+        -MAKEFLAGS "PYTHON3=$dir/bin/tabbypy3")
+    if ! echo 'int main(){}' | "$CXX" -x c++ - -o /dev/null -latomic 2>/dev/null; then
+        makeflags+=(-MAKEFLAGS "CFG_LDLIBS_THREADS=-pthread")
+        info "libatomic missing; linking without -latomic"
+    fi
     info "testing Verilator with '$CXX' (takes a few seconds)..."
     if ! (
         cd "$work" &&
             PATH="$dir/bin:$PATH" verilator --binary -j 0 --top-module smoke_tb \
-                -MAKEFLAGS "CXX=$CXX" -MAKEFLAGS "LINK=$CXX" \
-                -MAKEFLAGS "PYTHON3=$dir/bin/tabbypy3" \
-                smoke_tb.sv >build.log 2>&1 &&
+                "${makeflags[@]}" smoke_tb.sv >build.log 2>&1 &&
             PATH="$dir/bin:$PATH" ./obj_dir/Vsmoke_tb >run.log 2>&1 &&
             grep -q PASS run.log
     ); then

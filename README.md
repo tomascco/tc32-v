@@ -27,7 +27,11 @@ learning and for my portfolio, during my graduate studies in Digital Microelectr
 - `g++` 10 or newer (or `clang++` 5 or newer). Verilator uses C++20 coroutines for
   `--timing`.
 - `make`.
-- `perl`, because the `verilator` executable is a Perl script.
+- `perl`, because the `verilator` executable is a Perl script. If the `FindBin` module is
+  missing (RHEL/Rocky 9 split it into the `perl-FindBin` package), the Makefile falls back
+  to the stand-in in `scripts/perl5/`; no root needed.
+- If the `libatomic` package is missing (also common on RHEL/Rocky 9), the Makefile links
+  the testbenches without `-latomic`, which x86-64 does not need.
 - Optional: `ccache`. If it is on the PATH, the Makefile uses it automatically (see below).
 
 No root access is needed. If the system compiler is too old,
