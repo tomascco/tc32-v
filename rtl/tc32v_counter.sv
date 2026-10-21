@@ -20,10 +20,10 @@ module tc32v_counter #(
         if (rst) begin
             q <= '0;
         end else if (en) begin
-            // WIDTH'(1) is the constant 1 with WIDTH bits, so the sum has the
+            // WIDTH'(1'b1) is the constant 1 with WIDTH bits, so the sum has the
             // same width as q (Verilator warns when the widths differ).
             // The sum drops the carry, so overflow wraps to zero by itself.
-            q <= q + WIDTH'(1);
+            q <= q + WIDTH'(1'b1);
         end
     end
 endmodule
