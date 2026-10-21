@@ -18,9 +18,14 @@ contato com HDL: priorize código legível e didático em vez de código esperto
 
 ## Ferramentas
 
+Toda a stack vem do **OSS CAD Suite** numa release de data fixa, definida no `tools.lock` e
+instalada sem root por `make tools` em `~/.local/opt`. O mesmo caminho vale para o PC do
+autor (CachyOS, shell fish), o PC do laboratório (sem root) e o CI. Não instale ferramentas
+por pacote do sistema nem por outro caminho. O host só precisa de `g++` e `make`.
+
 - **Verilator 5.052 ou mais novo** é o único simulador do fluxo automatizado. Versões antigas
-  não têm covergroups (5.050+) nem UVM 2020-3.2 (5.052). Não use pacotes de distro.
-- **z3** precisa estar instalado: o Verilator chama um solver SMT em tempo de execução para
+  não têm covergroups (5.050+) nem UVM 2020-3.2 (5.052).
+- **z3** (vem no OSS CAD Suite): o Verilator chama um solver SMT em tempo de execução para
   `randomize()` com constraints.
 - **Yosys** com o frontend **sv-elab** (antigo yosys-slang, comando `read_slang`), usado como
   checagem de que o RTL é sintetizável (`synth_ecp5`, alvo LFE5U-25F) e como segundo lint,
@@ -61,6 +66,9 @@ contato com HDL: priorize código legível e didático em vez de código esperto
 
 ## Comandos
 
+- `make tools`: instala as ferramentas fixadas no `tools.lock` (só na primeira vez).
+- `make tools-prune`: apaga, com confirmação, versões do OSS CAD Suite que não são a do
+  `tools.lock`. Nunca rode isso automaticamente.
 - `make lint`: lint de todo o RTL (Verilator `-Wall` e elaboração com sv-elab).
 - `make test`: roda todos os testbenches.
 - `make test-<modulo>`: roda um testbench.
