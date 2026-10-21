@@ -1,0 +1,11 @@
+# Pinned OSS CAD Suite version (https://github.com/YosysHQ/oss-cad-suite-build).
+# Read by scripts/setup-tools.sh (bash) and by the Makefile (include).
+# Format: KEY=value, no spaces and no quotes.
+#
+# Release 2026-10-20: Verilator 5.053 (devel, after 5.052), Yosys 0.70+176
+# with sv-elab (read_slang) built in, z3 4.15.5.
+#
+# To update: change the date, download the new .tgz, run `sha256sum` on it and
+# write the result below. Then run `make tools`.
+OSS_CAD_SUITE_DATE=2026-10-20
+OSS_CAD_SUITE_SHA256=8b9975b9a7b4336ab4fce180328ecc38313aa8c96fedb8d399edbbf7984f9a3c

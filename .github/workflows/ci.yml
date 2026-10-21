@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      # The OSS CAD Suite installed by `make tools` lives in .tools/. The key
+      # changes with tools.lock, so switching versions invalidates the cache.
+      - uses: actions/cache@v6
+        with:
+          path: .tools
+          key: oss-cad-suite-${{ hashFiles('tools.lock') }}
+
+      # Same install path used locally; nothing comes from apt.
+      - run: make tools
+      - run: make lint
+      - run: make test
+      - run: SEED=2 make test
+      - run: SEED=3 make test
+      - run: make synth
