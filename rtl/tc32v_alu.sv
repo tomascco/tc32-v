@@ -1,26 +1,30 @@
-module tc32v_alu (
-    input  logic [31:0] a,
-    input  logic [31:0] b,
-    input  logic [3: 0] op,
-    output logic [31:0] result,
-    output logic        zero
+module tc32v_alu
+import tc32v_pkg::*;
+
+(
+    output word_t   result,
+    output logic    zero_h,
+    input  word_t   a,
+    input  word_t   b,
+    input  alu_op_t op
 );
     
     always_comb begin
         case (op)
-            4'b0000: result = 32'(a + b);
-            4'b0001: result = 32'(a - b);
-            4'b0010: result = 32'(a & b);
-            4'b0011: result = 32'(a | b);
-            4'b0100: result = 32'(a ^ b);
-            4'b0101: result = 32'($signed(a) < $signed(b));
-            4'b0110: result = 32'(a < b);
-            4'b0111: result = a << b[4:0];
-            4'b1000: result = a >> b[4:0];
-            4'b1001: result = $signed(a) >>> b[4:0];
+            ALU_ADD : result = 32'(a + b);
+            ALU_SUB : result = 32'(a - b);
+            ALU_AND : result = 32'(a & b);
+            ALU_ORR : result = 32'(a | b);
+            ALU_XOR : result = 32'(a ^ b);
+            ALU_SLT : result = 32'($signed(a) < $signed(b));
+            ALU_SLTU: result = 32'(a < b);
+            ALU_SLL : result = a << b[0][4:0];
+            ALU_SRL : result = a >> b[0][4:0];
+            ALU_SRA : result = $signed(a) >>> b[0][4:0];
+            // TODO: this should raise an exception.
             default: result = 32'(0);
         endcase
     end
 
-    assign zero = result == '0;
+    assign zero_h = result == '0;
 endmodule
