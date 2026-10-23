@@ -13,4 +13,6 @@ package tc32v_pkg;
         ALU_SRL,
         ALU_SRA
     } alu_op_t;
+
+    typedef logic [4:0] reg_index_t;
 endpackage
