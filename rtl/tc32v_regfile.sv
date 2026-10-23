@@ -1,3 +1,5 @@
+`timescale 1ns/1ps
+
 module tc32v_regfile
 import tc32v_pkg::*;
 (

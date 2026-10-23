@@ -1,3 +1,5 @@
+`timescale 1ns/1ps
+
 // selfcheck_fail_tb: a test that MUST fail.
 //
 // It exists to prove the flow works: a failing assert has to end the

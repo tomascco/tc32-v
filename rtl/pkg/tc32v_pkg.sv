@@ -1,3 +1,5 @@
+`timescale 1ns/1ps
+
 package tc32v_pkg;
     typedef logic [3:0][7:0] word_t;
     

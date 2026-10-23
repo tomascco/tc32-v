@@ -1,3 +1,5 @@
+`timescale 1ns/1ps
+
 // tc32v_counter: WIDTH-bit binary counter.
 //
 // - rst = 1: goes back to zero on the next rising edge of clk (synchronous reset).
