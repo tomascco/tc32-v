@@ -223,10 +223,72 @@ EOF
 }
 
 # ---------------------------------------------------------------------------
+# lz4 for --trace-fst (only on hosts without it)
+# ---------------------------------------------------------------------------
+
+# Downloads a file with curl or wget. $1 = URL, $2 = destination.
+download() {
+    if command -v curl >/dev/null 2>&1; then
+        curl -fL --retry 3 --progress-bar -o "$2" "$1"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q --show-progress -O "$2" "$1"
+    else
+        return 1
+    fi
+}
+
+# The FST writer in Verilator 5.053+ includes <lz4.h> and links -llz4. RHEL/Rocky
+# 9 ship lz4.h in a separate package (lz4-devel), often missing on machines
+# without root. In that case we build liblz4.a from the pinned source into
+# .tools/lz4-<version>/ (the Makefile uses it the same way). Only lz4.c is
+# needed, and it compiles as C++, so $CXX is enough.
+install_lz4() {
+    local dir="$TOOLS_ROOT/lz4-$LZ4_VERSION"
+    if echo 'int main() { return LZ4_compressBound(1) > 0 ? 0 : 1; }' |
+        "$CXX" -x c++ -include lz4.h - -o /dev/null -llz4 2>/dev/null; then
+        info "lz4:       found on the host"
+        return
+    fi
+    if [ -f "$dir/lib/liblz4.a" ]; then
+        info "lz4:       not on the host; using $dir"
+        return
+    fi
+
+    # Same atomic scheme as the OSS CAD Suite: build in a temporary directory,
+    # rename at the end. LZ4_TMP is global so the EXIT trap can see it.
+    local tmp name="lz4-$LZ4_VERSION.tar.gz" actual
+    mkdir -p "$TOOLS_ROOT"
+    LZ4_TMP="$(mktemp -d "$TOOLS_ROOT/.lz4-$LZ4_VERSION.tmp.XXXXXX")"
+    tmp="$LZ4_TMP"
+    trap 'rm -rf -- "$LZ4_TMP"' EXIT
+
+    info "lz4:       not on the host; building $LZ4_VERSION in $dir"
+    download "https://github.com/lz4/lz4/releases/download/v$LZ4_VERSION/$name" "$tmp/$name" ||
+        die "lz4 download failed."
+    actual="$(sha256sum "$tmp/$name" | awk '{ print $1 }')"
+    [ "$actual" = "$LZ4_SHA256" ] ||
+        die "lz4 SHA-256 mismatch.
+  expected (tools.lock): $LZ4_SHA256
+  got:                   $actual"
+    tar -xzf "$tmp/$name" -C "$tmp"
+
+    local src="$tmp/lz4-$LZ4_VERSION/lib"
+    mkdir -p "$tmp/out/include" "$tmp/out/lib"
+    "$CXX" -O2 -fPIC -c "$src/lz4.c" -o "$tmp/lz4.o" || die "could not compile lz4.c."
+    ar rcs "$tmp/out/lib/liblz4.a" "$tmp/lz4.o"
+    cp "$src/lz4.h" "$tmp/out/include/"
+    cp "$tmp/lz4-$LZ4_VERSION/LICENSE" "$tmp/out/"
+    mv -T -- "$tmp/out" "$dir"
+    rm -rf -- "$tmp"
+    trap - EXIT
+}
+
+# ---------------------------------------------------------------------------
 # Main program
 # ---------------------------------------------------------------------------
 
 check_host
+install_lz4
 
 if [ -d "$FINAL_DIR" ]; then
     info "OSS CAD Suite $DATE already installed in $FINAL_DIR"
