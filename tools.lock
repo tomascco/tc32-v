@@ -9,3 +9,10 @@
 # write the result below. Then run `make tools`.
 OSS_CAD_SUITE_DATE=2026-10-20
 OSS_CAD_SUITE_SHA256=8b9975b9a7b4336ab4fce180328ecc38313aa8c96fedb8d399edbbf7984f9a3c
+
+# lz4 (https://github.com/lz4/lz4), only for hosts without lz4.h. The FST
+# writer in Verilator 5.053+ (--trace-fst) includes <lz4.h> and links -llz4,
+# and the OSS CAD Suite does not ship them. On such hosts `make tools` builds
+# a local liblz4.a in .tools/lz4-<version>/.
+LZ4_VERSION=1.10.0
+LZ4_SHA256=537512904744b35e232912055ccf8ec66d768639ff3abe5788d90d792ec5f48b
