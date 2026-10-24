@@ -61,7 +61,7 @@ function __fish_complete_make_targets
                 test\t'runs the testbenches [module]' \
                 selfcheck\t'a failing assert must fail' \
                 synth\t'checks synthesis [module]' \
-                waves\t'writes build/<module>.fst' \
+                waves\t'writes build/<module>.fst and opens Surfer' \
                 clean\t'deletes build/'
     end
 end

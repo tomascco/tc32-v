@@ -78,7 +78,8 @@ CI. Do not install tools through system packages or any other path. The host onl
 - `make test <module>`: runs one testbench (`lint`, `synth` and `waves` also take modules;
   several are allowed).
 - `make synth`: check synthesis with Yosys.
-- `make waves <module>`: runs with an FST dump to open in GTKWave or Surfer.
+- `make waves <module>`: runs with an FST dump and opens it in Surfer (`VIEWER=gtkwave` or
+  `VIEWER=` to change or skip the viewer).
 - `scripts/completion/`: tab completion for bash and fish (see `docs/environment.md`).
 - `SEED=N make test`: changes the seed.
 

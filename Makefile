@@ -32,6 +32,11 @@ CXX ?= g++
 # Seed for the random tests. To change it: SEED=2 make test
 SEED ?= 1
 
+# Waveform viewer that `make waves` opens when the simulation ends. Surfer
+# ships with the OSS CAD Suite. VIEWER=gtkwave also works; VIEWER= (empty)
+# only writes the .fst.
+VIEWER ?= surfer
+
 # read_slang (sv-elab) is built into Yosys 0.67 or newer; before that it is a
 # plugin loaded with `yosys -m slang`. We detect which case applies here.
 # We never fall back to `read_verilog -sv`: without sv-elab, lint and synth fail.
@@ -147,6 +152,19 @@ endif
 # time. This helps find registers that depend on a power-up value.
 SIM_ARGS = +verilator+seed+$(SEED) +verilator+rand+reset+2
 
+# Opens the waveform $(1) in $(VIEWER), in the background, so make returns
+# right away. The viewer output goes to $(2). Without a display (ssh, CI) it
+# only prints a note.
+define open_viewer
+	@if [ -z "$(VIEWER)" ]; then :; \
+	elif [ -z "$$DISPLAY$$WAYLAND_DISPLAY" ]; then \
+	    echo "no display: $(VIEWER) not opened"; \
+	else \
+	    echo "opening $(1) in $(VIEWER) (log in $(2))"; \
+	    nohup $(VIEWER) $(1) >$(2) 2>&1 & \
+	fi
+endef
+
 # Compiles tb/$(1)_tb.sv with all the RTL into build/$(2)/. $(3) is extra flags.
 define build_tb
 	@mkdir -p build/$(2)
@@ -187,13 +205,13 @@ help:
 	@echo "  make test <module>    runs one testbench, e.g. make test tc32v_counter"
 	@echo "  make selfcheck        confirms that a failing assert fails the test"
 	@echo "  make synth [module]   check synthesis (Yosys, synth_ecp5)"
-	@echo "  make waves <module>   runs one testbench writing build/<module>.fst"
+	@echo "  make waves <module>   runs one testbench, writes build/<module>.fst, opens Surfer"
 	@echo "  make clean            deletes build/"
 	@echo ""
 	@echo "lint, test, synth and waves accept several modules: make test a b"
 	@echo "Tab completion for bash and fish: see scripts/completion/."
 	@echo ""
-	@echo "Variables: SEED=$(SEED) CXX=$(CXX)"
+	@echo "Variables: SEED=$(SEED) CXX=$(CXX) VIEWER=$(VIEWER)"
 	@echo "Modules found:     $(or $(RTL_MODS),(none))"
 	@echo "Testbenches found: $(or $(TESTS),(none))"
 
@@ -269,6 +287,7 @@ waves-%: check-tools
 	$(call build_tb,$*,$*-waves,--trace-fst $(VERILATOR_FST_FLAGS))
 	build/$*-waves/$*_tb $(SIM_ARGS) +dumpfile=build/$*.fst
 	@echo "waves in build/$*.fst"
+	$(call open_viewer,build/$*.fst,build/$*-waves/viewer.log)
 
 # --- synthesis --------------------------------------------------------------
 

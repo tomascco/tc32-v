@@ -50,7 +50,8 @@ How `make tools` installs the tools, and which versions are pinned, is described
 | `make selfcheck` | confirms that a failing `assert` gives a non-zero exit code |
 | `make synth` | check synthesis with Yosys (`synth_ecp5`); report in `build/synth/` |
 | `make synth <module>` | checks synthesis of one module |
-| `make waves <module>` | runs the testbench and writes `build/<module>.fst` (GTKWave or Surfer) |
+| `make waves <module>` | runs the testbench, writes `build/<module>.fst` and opens it in Surfer |
+| `VIEWER=gtkwave make waves <module>` | opens GTKWave instead; `VIEWER=` only writes the file |
 | `make clean` | deletes `build/` |
 | `SEED=N make test` | changes the seed of the random tests (default 1) |
 
