@@ -4,7 +4,7 @@
 // simulation with a non-zero exit code, and CI has to turn red.
 // `make selfcheck` runs this test and only passes if it fails.
 //
-// It is not part of `make test-<module>`: it is only called by `make selfcheck`
+// It is not part of `make test <module>`: it is only called by `make selfcheck`
 // (which `make test` includes).
 
 module selfcheck_fail_tb;

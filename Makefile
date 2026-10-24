@@ -32,6 +32,11 @@ CXX ?= g++
 # Seed for the random tests. To change it: SEED=2 make test
 SEED ?= 1
 
+# Waveform viewer that `make waves` opens when the simulation ends. Surfer
+# ships with the OSS CAD Suite. VIEWER=gtkwave also works; VIEWER= (empty)
+# only writes the .fst.
+VIEWER ?= surfer
+
 # read_slang (sv-elab) is built into Yosys 0.67 or newer; before that it is a
 # plugin loaded with `yosys -m slang`. We detect which case applies here.
 # We never fall back to `read_verilog -sv`: without sv-elab, lint and synth fail.
@@ -70,6 +75,39 @@ RTL_MODS := $(basename $(notdir $(MOD_SRCS)))
 # handled separately (it has to fail).
 TB_SRCS := $(call declares,$(wildcard tb/*_tb.sv))
 TESTS := $(filter-out selfcheck_fail,$(patsubst %_tb,%,$(basename $(notdir $(TB_SRCS)))))
+
+# ---------------------------------------------------------------------------
+# Modules on the command line: `make test tc32v_alu`
+# ---------------------------------------------------------------------------
+
+# make reads every word on the command line as a goal. When one of the VERBS
+# is given, the other words that are not targets of this Makefile are module
+# names: they go into MODULES and become targets that do nothing (at the end
+# of this file). Without modules, each verb works on every module.
+#   make test                    every testbench plus selfcheck
+#   make test tc32v_alu          only tc32v_alu_tb
+#   make lint tc32v_alu tc32v_counter
+VERBS := test waves lint synth
+TARGETS := help setup tools tools-prune selfcheck clean $(VERBS) \
+    $(addsuffix -%,$(VERBS) check)
+
+GIVEN_VERBS := $(filter $(VERBS),$(MAKECMDGOALS))
+ifneq ($(GIVEN_VERBS),)
+  MODULES := $(filter-out $(TARGETS),$(MAKECMDGOALS))
+endif
+
+# `make test waves tc32v_alu` is ambiguous: which verb gets the module?
+ifneq ($(MODULES),)
+  ifneq ($(words $(GIVEN_VERBS)),1)
+    $(error Modules can follow only one of: $(VERBS). Got: $(GIVEN_VERBS))
+  endif
+endif
+
+ifneq ($(filter waves,$(MAKECMDGOALS)),)
+  ifeq ($(MODULES),)
+    $(error Usage: make waves <module>. Testbenches found: $(or $(TESTS),(none)))
+  endif
+endif
 
 # ---------------------------------------------------------------------------
 # Flags
@@ -114,6 +152,19 @@ endif
 # time. This helps find registers that depend on a power-up value.
 SIM_ARGS = +verilator+seed+$(SEED) +verilator+rand+reset+2
 
+# Opens the waveform $(1) in $(VIEWER), in the background, so make returns
+# right away. The viewer output goes to $(2). Without a display (ssh, CI) it
+# only prints a note.
+define open_viewer
+	@if [ -z "$(VIEWER)" ]; then :; \
+	elif [ -z "$$DISPLAY$$WAYLAND_DISPLAY" ]; then \
+	    echo "no display: $(VIEWER) not opened"; \
+	else \
+	    echo "opening $(1) in $(VIEWER) (log in $(2))"; \
+	    nohup $(VIEWER) $(1) >$(2) 2>&1 & \
+	fi
+endef
+
 # Compiles tb/$(1)_tb.sv with all the RTL into build/$(2)/. $(3) is extra flags.
 define build_tb
 	@mkdir -p build/$(2)
@@ -130,26 +181,37 @@ define require_tb
 	fi
 endef
 
+# The same for the RTL of $*, used by lint and synth.
+define require_rtl
+	@if [ -z "$(filter $*,$(RTL_MODS))" ]; then \
+	    echo "ERROR: rtl/$*.sv does not exist or does not declare a module yet."; \
+	    exit 1; \
+	fi
+endef
+
 # ---------------------------------------------------------------------------
 # Targets
 # ---------------------------------------------------------------------------
 
-.PHONY: help setup tools tools-prune check-tools check-slang lint test selfcheck synth clean
+.PHONY: help setup tools tools-prune check-tools check-slang lint test selfcheck synth waves clean
 
 help:
 	@echo "Targets:"
 	@echo "  make setup            full setup: tools, lint and test"
 	@echo "  make tools            installs the tools from tools.lock into .tools/"
 	@echo "  make tools-prune      deletes OSS CAD Suite versions not in tools.lock"
-	@echo "  make lint             lints all RTL (Verilator -Wall and sv-elab)"
+	@echo "  make lint [module]    lints the RTL (Verilator -Wall and sv-elab)"
 	@echo "  make test             runs every testbench (includes selfcheck)"
-	@echo "  make test-<module>    runs one testbench, e.g. make test-tc32v_counter"
+	@echo "  make test <module>    runs one testbench, e.g. make test tc32v_counter"
 	@echo "  make selfcheck        confirms that a failing assert fails the test"
-	@echo "  make synth            check synthesis (Yosys, synth_ecp5)"
-	@echo "  make waves-<module>   runs one testbench writing build/<module>.fst"
+	@echo "  make synth [module]   check synthesis (Yosys, synth_ecp5)"
+	@echo "  make waves <module>   runs one testbench, writes build/<module>.fst, opens Surfer"
 	@echo "  make clean            deletes build/"
 	@echo ""
-	@echo "Variables: SEED=$(SEED) CXX=$(CXX)"
+	@echo "lint, test, synth and waves accept several modules: make test a b"
+	@echo "Tab completion for bash and fish: see scripts/completion/."
+	@echo ""
+	@echo "Variables: SEED=$(SEED) CXX=$(CXX) VIEWER=$(VIEWER)"
 	@echo "Modules found:     $(or $(RTL_MODS),(none))"
 	@echo "Testbenches found: $(or $(TESTS),(none))"
 
@@ -165,8 +227,8 @@ setup: tools
 	@echo ""
 	@echo "Setup done. Next steps:"
 	@echo "  - write the RTL in rtl/ and the testbench in tb/ (template: tb/tc32v_counter_tb.sv)"
-	@echo "  - make test-<module>   runs one testbench"
-	@echo "  - make waves-<module>  writes build/<module>.fst; open it with"
+	@echo "  - make test <module>   runs one testbench"
+	@echo "  - make waves <module>  writes build/<module>.fst; open it with"
 	@echo "      $(TOOLS_DIR)/bin/surfer build/<module>.fst"
 	@echo "  - make help            lists every target"
 
@@ -188,16 +250,18 @@ check-slang: check-tools
 
 # --- lint -------------------------------------------------------------------
 
-lint: $(addprefix lint-,$(RTL_MODS))
+lint: $(addprefix lint-,$(or $(MODULES),$(RTL_MODS)))
 
 lint-%: check-slang
+	$(require_rtl)
 	verilator --lint-only -Wall --quiet -Irtl -Irtl/pkg --top-module $* $(RTL_SRCS)
 	yosys -q $(SLANG_LOAD) -p "read_slang -DSYNTHESIS -I rtl -I rtl/pkg --top $* $(RTL_SRCS); hierarchy -check -top $*"
 	@echo "lint $*: ok"
 
 # --- tests ------------------------------------------------------------------
 
-test: selfcheck $(addprefix test-,$(TESTS))
+# With modules on the command line, only their testbenches run (no selfcheck).
+test: $(if $(MODULES),,selfcheck) $(addprefix test-,$(or $(MODULES),$(TESTS)))
 
 test-%: check-tools
 	$(require_tb)
@@ -216,17 +280,21 @@ selfcheck: check-tools
 	    echo "selfcheck: ok (selfcheck_fail_tb failed with code $$?, as expected)"; \
 	fi
 
+waves: $(addprefix waves-,$(MODULES))
+
 waves-%: check-tools
 	$(require_tb)
 	$(call build_tb,$*,$*-waves,--trace-fst $(VERILATOR_FST_FLAGS))
 	build/$*-waves/$*_tb $(SIM_ARGS) +dumpfile=build/$*.fst
 	@echo "waves in build/$*.fst"
+	$(call open_viewer,build/$*.fst,build/$*-waves/viewer.log)
 
 # --- synthesis --------------------------------------------------------------
 
-synth: $(addprefix synth-,$(RTL_MODS))
+synth: $(addprefix synth-,$(or $(MODULES),$(RTL_MODS)))
 
 synth-%: check-slang
+	$(require_rtl)
 	@mkdir -p build/synth
 	yosys -q $(SLANG_LOAD) -l build/synth/$*.log \
 	    -p "read_slang -DSYNTHESIS -I rtl -I rtl/pkg --top $* $(RTL_SRCS); synth_ecp5 -top $*; tee -o build/synth/$*.stat stat"
@@ -234,3 +302,11 @@ synth-%: check-slang
 
 clean:
 	rm -rf build
+
+# The module names given on the command line (see MODULES) are goals too. This
+# rule makes them do nothing; the work is done by the verb that came with them.
+ifneq ($(MODULES),)
+.PHONY: $(MODULES)
+$(MODULES):
+	@:
+endif

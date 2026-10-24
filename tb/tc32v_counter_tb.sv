@@ -10,9 +10,9 @@
 //      were exercised, and the result is printed at the end.
 //
 // How to run:
-//   make test-tc32v_counter            (seed 1)
-//   SEED=7 make test-tc32v_counter     (another seed)
-//   make waves-tc32v_counter           (writes build/tc32v_counter.fst)
+//   make test tc32v_counter            (seed 1)
+//   SEED=7 make test tc32v_counter     (another seed)
+//   make waves tc32v_counter           (writes build/tc32v_counter.fst)
 //
 // Timing convention: inputs change 1 time unit after the rising clock edge
 // and are sampled by the DUT on the next edge. This way there is never a race
@@ -49,7 +49,7 @@ module tc32v_counter_tb;
     );
 
     // Waves: only written when the simulator gets +dumpfile=<file>
-    // (`make waves-tc32v_counter` does that).
+    // (`make waves tc32v_counter` does that).
     initial begin
         string dump_file;
         if ($value$plusargs("dumpfile=%s", dump_file) != 0) begin
