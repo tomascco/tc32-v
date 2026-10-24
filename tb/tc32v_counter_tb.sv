@@ -1,3 +1,5 @@
+`timescale 1ns/1ps
+
 // tc32v_counter_tb: testbench for tc32v_counter.
 //
 // It is the template for the other testbenches. It has three parts:

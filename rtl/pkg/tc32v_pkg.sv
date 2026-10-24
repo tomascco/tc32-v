@@ -1,3 +1,5 @@
+`timescale 1ns/1ps
+
 package tc32v_pkg;
     typedef logic [3:0][7:0] word_t;
     
@@ -13,4 +15,6 @@ package tc32v_pkg;
         ALU_SRL,
         ALU_SRA
     } alu_op_t;
+
+    typedef logic [4:0] reg_index_t;
 endpackage
