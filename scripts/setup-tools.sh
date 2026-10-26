@@ -174,6 +174,33 @@ check_tools() {
     die "the Yosys in this release has no read_slang (sv-elab)."
 }
 
+# The bin/surfer wrapper in some releases (2026-10-20, at least) has two exec
+# lines: first one with the host glibc, then one with the glibc bundled in
+# lib/. Only the first runs, so on hosts with an older glibc (Rocky 9 has
+# 2.34) Surfer fails with "GLIBC_2.43 not found". We delete the first line
+# so the bundled glibc is used.
+#
+# With the bundled glibc, Surfer only finds the libraries in lib/. lib/ has
+# the Mesa driver for GLX (X11), but not the one for EGL (Wayland), so on a
+# Wayland session Surfer panics with "provided display handle is not
+# supported". When X11 is also available (XWayland, DISPLAY set), we unset
+# WAYLAND_DISPLAY so Surfer opens through X11 and GLX.
+#
+# Each step does nothing if the wrapper already has it.
+fix_surfer_wrapper() {
+    local wrapper="$1/bin/surfer"
+    [ -f "$wrapper" ] || return 0
+    grep -q '^exec .*/lib/ld-linux-x86-64.so.2 .*/libexec/surfer' "$wrapper" || return 0
+    if grep -q '^exec "$release_topdir_abs"/libexec/surfer ' "$wrapper"; then
+        sed -i '\|^exec "$release_topdir_abs"/libexec/surfer |d' "$wrapper"
+        info "surfer:    wrapper fixed to use the bundled glibc"
+    fi
+    if ! grep -q 'unset WAYLAND_DISPLAY' "$wrapper"; then
+        sed -i '\|^exec .*/lib/ld-linux-x86-64.so.2 |i [ -n "$DISPLAY" ] \&\& unset WAYLAND_DISPLAY' "$wrapper"
+        info "surfer:    wrapper fixed to use X11 (no EGL driver in the bundle)"
+    fi
+}
+
 # Builds and runs a minimal testbench with --binary, using $CXX. This proves
 # that the compiler, make, perl, coroutines (--timing) and z3 (randomize with
 # a constraint) work together on this machine. It runs inside the install's
@@ -293,6 +320,7 @@ install_lz4
 if [ -d "$FINAL_DIR" ]; then
     info "OSS CAD Suite $DATE already installed in $FINAL_DIR"
     check_tools "$FINAL_DIR"
+    fix_surfer_wrapper "$FINAL_DIR"
     exit 0
 fi
 
@@ -340,6 +368,7 @@ fi
 
 check_tools "$TMP_DIR/oss-cad-suite"
 smoke_test "$TMP_DIR/oss-cad-suite"
+fix_surfer_wrapper "$TMP_DIR/oss-cad-suite"
 
 # Only now does the directory get its final name. A rename within the same
 # filesystem is atomic.
