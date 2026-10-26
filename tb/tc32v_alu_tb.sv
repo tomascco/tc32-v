@@ -20,12 +20,10 @@ module tc32v_alu_tb;
         b  = test_b;
         op = test_op;
         #1;
-        assert(result == expected);
-        else
+        assert(result == expected) else
             $fatal(1, "Expected %d, received %d\nInputs: %d, %d, %s", expected, result, test_a, test_b, test_op);
 
-        assert(zero_h == expected_zero)
-            else
+        assert(zero_h == expected_zero) else
             $fatal(1, "Expected zero to be %d, received %d\nInputs: %d, %d, %s", expected_zero, zero_h, test_a, test_b, test_op);
     endtask
 
