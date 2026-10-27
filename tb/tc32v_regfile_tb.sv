@@ -31,7 +31,7 @@ module tc32v_regfile_tb;
         // x0 is always zero
         a2 = '0;
         #1
-        assert(rd2 == '0);
+        assert(rd2 == '0)
             else $fatal(1, "Expected x0 to be fixed in 0, got %d", rd2);
 
         // x1 = h7FFF_FFFF
@@ -40,14 +40,14 @@ module tc32v_regfile_tb;
         wd = 32'h7FFF_FFFF;
         #2
 
-        assert(dut.registers[1] == 32'h7FFF_FFFF);
+        assert(dut.registers[1] == 32'h7FFF_FFFF)
             else $fatal(1, "Expected 32'h%h, received 32'h%h", 32'h7FFF_FFFF, dut.registers[1]);
 
         // x2 = h0000_0000
         a3 = 5'd2;
         wd = 32'd1;
         #2
-        assert(dut.registers[2] == 32'd1);
+        assert(dut.registers[2] == 32'd1)
             else $fatal(1, "Expected 32'h%h, received 32'h%h", 32'h0000_0001, dut.registers[2]);
         
         // x2 not changed, we3 disabled
@@ -55,7 +55,7 @@ module tc32v_regfile_tb;
         a3 = 5'd2;
         wd = 32'd24;
         #2
-        assert(dut.registers[2] == 32'd1);
+        assert(dut.registers[2] == 32'd1)
             else $fatal(1, "Expected 32'h%h, received 32'h%h", 32'h0000_0001, dut.registers[2] == 32'd1);
 
 
@@ -63,10 +63,10 @@ module tc32v_regfile_tb;
         a2 = 5'd2;
         #1
 
-        assert(rd1 == 32'h7FFF_FFFF);
+        assert(rd1 == 32'h7FFF_FFFF)
             else $fatal(1, "Expected 32'h%h, received 32'h%h", 32'h7FFF_FFFF, rd1);
 
-        assert(rd2 == 32'h0000_0001);
+        assert(rd2 == 32'h0000_0001)
             else $fatal(1, "Expected 32'h%h, received 32'h%h", 32'h0000_0001, rd2);
 
         we3 = 1;

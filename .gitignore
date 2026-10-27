@@ -2,3 +2,13 @@ build/
 .tools/
 *.fst
 *.vcd
+
+# Xcelium / SimVision (used manually in the lab)
+xcelium.d/
+waves.shm/
+.simvision/
+xrun.history
+xrun.key
+xrun.log
+.symbolnamelist
+.symbolportinfomap
