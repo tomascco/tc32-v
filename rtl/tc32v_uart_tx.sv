@@ -2,12 +2,12 @@
 
 module tc32v_uart_tx #(
 ) (
-    output tx,
-    output busy,
-    input  clk,
-    input  rst,
-    input  start,
-    input  [7:0] d
+    output logic tx,
+    output logic busy,
+    input  logic clk,
+    input  logic rst,
+    input  logic start,
+    input  logic [7:0] d
 );
 
     typedef enum logic { IDLING, SENDING } fsm_t;
