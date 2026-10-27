@@ -13,7 +13,7 @@ module tc32v_uart_tx #(
     typedef enum logic { IDLING, SENDING } fsm_t;
     fsm_t state;
     logic bit_end, last_bit;
-    logic [9:0] packet;
+    logic [9:0] dataframe;
     
     logic bit_counter_en;
     logic bit_counter_rst;
@@ -25,49 +25,68 @@ module tc32v_uart_tx #(
     logic [7:0] baud_count;
     tc32v_counter #(.WIDTH(8)) baud_counter (.clk, .rst(baud_counter_rst), .en(baud_counter_en), .q(baud_count));
     
+
     // FSM State control
+    fsm_t next_state;
+    always_comb begin
+        case (state)
+            IDLING : next_state = start ? SENDING : IDLING;
+            SENDING: next_state = (last_bit && bit_end) ? IDLING : SENDING;
+        endcase
+    end
+
     always_ff @(posedge clk) begin
         if (rst) begin
             state <= IDLING;
         end else begin
-            case (state)
-                IDLING : state <= start    ? SENDING : IDLING;
-                SENDING: state <= last_bit ? IDLING  : SENDING;
-            endcase
+            state <= next_state;
         end
     end
 
-    // Datapath state control
+    // Datapath shift register control
     always_ff @(posedge clk) begin
-        baud_counter_rst <= 0;
-        bit_counter_rst  <= 0;
+        if (rst) begin
+            dataframe <= '1;
+        end else if (state == IDLING && next_state == SENDING) begin
+            dataframe <= {1'b1, d, 1'b0};
+        end else if (state == SENDING && bit_end) begin
+            dataframe <= {1'b1, dataframe[9:1]};
+        end
+    end
+
+    // Datapath baud counter control
+    always_comb begin
+        baud_counter_rst = 0;
+        baud_counter_en  = 0;
 
         if (rst) begin
-            baud_counter_rst <= 1;
-            bit_counter_rst  <= 1;
-        end else if (state == IDLING && start == 1) begin
-            packet <= {1'd1, d, 1'd0};
+            baud_counter_rst = 1;
+        end else if (state == SENDING) begin
+            baud_counter_en = 1;
 
-            baud_counter_en <= 1;
-            bit_counter_en  <= 1;
+            if (bit_end) begin
+                baud_counter_rst = 1;
+            end
+        end
+    end
 
-            bit_end         <= 0;
-            last_bit        <= 0;
+    // Datapath bit counter control
+    always_comb begin
+        bit_counter_rst = 0;
+        bit_counter_en  = 0;
 
-        // 216 is number of clock cycles for a 115200 baud rate at 25mhz
-        end else if (state == SENDING && baud_count == 8'd216) begin
-            bit_end <= 1;
-            baud_counter_rst <= 1;
-        end else if (state == SENDING && bit_end) begin
-            tx <= packet[0];
-            packet <= {1'd1, packet[9:1]};
-            
-            bit_end <= 0;
-        end else if (state == SENDING && bit_count == 9) begin
-            last_bit <= 1;
+        if (rst) begin
+            bit_counter_rst = 1;
+        end else if (state == SENDING && bit_end && ~last_bit) begin
+            bit_counter_en = 1;
+        end else if (state == IDLING && next_state == SENDING) begin
+            bit_counter_rst = 1;
         end
     end
 
     // Datapath signals
-    assign last_bit = 
+    assign last_bit = bit_count == 9;
+    assign bit_end  = baud_count == 216;
+    assign tx       = dataframe[0];
+    assign busy     = (state == SENDING) ? 1 : 0;
 endmodule
