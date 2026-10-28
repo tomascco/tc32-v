@@ -17,4 +17,10 @@ package tc32v_pkg;
     } alu_op_t;
 
     typedef logic [4:0] reg_index_t;
+    typedef enum logic [1:0] {
+        I_SIGNED_12_BITS,
+        S_SIGNED_12_BITS,
+        B_SIGNED_13_BITS,
+        J_SIGNED_21_BITS
+    } imm_t;
 endpackage
