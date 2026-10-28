@@ -12,7 +12,7 @@ module tc32v_uart_tx_tb;
         string dump_file;
         if ($value$plusargs("dumpfile=%s", dump_file) != 0) begin
             $dumpfile(dump_file);
-            $dumpvars(0, tc32v_regfile_tb);
+            $dumpvars(0, tc32v_uart_tx_tb);
         end
     end
 
