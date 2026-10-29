@@ -321,9 +321,11 @@ selfcheck: check-tools
 
 waves: $(addprefix waves-,$(MODULES))
 
+# By default Verilator leaves out of the dump any unpacked array with more than
+# 32 elements (memories, register file). --trace-max-array raises that limit.
 waves-%: check-tools
 	$(require_tb)
-	$(call build_tb,$*,$*-waves,--trace-fst $(VERILATOR_FST_FLAGS))
+	$(call build_tb,$*,$*-waves,--trace-fst --trace-max-array 1024 $(VERILATOR_FST_FLAGS))
 	build/$*-waves/$*_tb $(SIM_ARGS) +dumpfile=build/$*.fst
 	@echo "waves in build/$*.fst"
 	$(call open_viewer,build/$*.fst,build/$*-waves/viewer.log)
