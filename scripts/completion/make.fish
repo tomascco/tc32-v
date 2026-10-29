@@ -1,5 +1,6 @@
 # Fish tab completion for the TC32-V Makefile: `make test <TAB>` lists the
-# testbenches, `make lint <TAB>` the RTL modules.
+# testbenches, `make lint <TAB>` the RTL modules, `make fpga <TAB>` the FPGA
+# designs of the board.
 #
 # To enable it, add this line to ~/.config/fish/config.fish:
 #   set -p fish_complete_path /path/to/tc32-v/scripts/completion
@@ -39,7 +40,7 @@ function __fish_complete_make_targets
     set -l words (commandline -opc)
     set -l verb
     for word in $words[2..]
-        if contains -- $word test waves lint synth
+        if contains -- $word test waves lint synth fpga prog
             set verb $word
         end
     end
@@ -50,6 +51,11 @@ function __fish_complete_make_targets
                 string match -v selfcheck_fail | string replace -r '$' \ttestbench
         case lint synth
             __tc32v_declared rtl/*.sv | string replace -r '^rtl/(.*)\.sv$' '$1\tmodule'
+        case fpga prog
+            set -l board icesugar-pro
+            set -q BOARD; and set board $BOARD
+            __tc32v_declared fpga/$board/*_top.sv |
+                string replace -r '^.*/(.*)_top\.sv$' '$1\tdesign'
         case '*'
             # Keep in sync with `make help`.
             printf '%s\n' \
@@ -62,6 +68,8 @@ function __fish_complete_make_targets
                 selfcheck\t'a failing assert must fail' \
                 synth\t'checks synthesis [module]' \
                 waves\t'writes build/<module>.fst and opens Surfer' \
+                fpga\t'builds the bitstream [design]' \
+                prog\t'programs the board with <design>' \
                 clean\t'deletes build/'
     end
 end

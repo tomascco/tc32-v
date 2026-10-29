@@ -76,6 +76,13 @@ RTL_MODS := $(basename $(notdir $(MOD_SRCS)))
 TB_SRCS := $(call declares,$(wildcard tb/*_tb.sv))
 TESTS := $(filter-out selfcheck_fail,$(patsubst %_tb,%,$(basename $(notdir $(TB_SRCS)))))
 
+# FPGA designs: fpga/<board>/<design>_top.sv, top <design>_top. fpga/common/
+# has the FPGA-only modules shared by every board (power-on reset).
+BOARD ?= icesugar-pro
+FPGA_COMMON_SRCS := $(call declares,$(wildcard fpga/common/*.sv))
+FPGA_TOPS := $(call declares,$(wildcard fpga/$(BOARD)/*_top.sv))
+DESIGNS := $(patsubst %_top,%,$(basename $(notdir $(FPGA_TOPS))))
+
 # ---------------------------------------------------------------------------
 # Modules on the command line: `make test tc32v_alu`
 # ---------------------------------------------------------------------------
@@ -83,11 +90,13 @@ TESTS := $(filter-out selfcheck_fail,$(patsubst %_tb,%,$(basename $(notdir $(TB_
 # make reads every word on the command line as a goal. When one of the VERBS
 # is given, the other words that are not targets of this Makefile are module
 # names: they go into MODULES and become targets that do nothing (at the end
-# of this file). Without modules, each verb works on every module.
+# of this file). Without modules, each verb works on every module. For fpga
+# and prog, the names are FPGA designs (blink) instead of modules.
 #   make test                    every testbench plus selfcheck
 #   make test tc32v_alu          only tc32v_alu_tb
 #   make lint tc32v_alu tc32v_counter
-VERBS := test waves lint synth
+#   make fpga blink              bitstream of fpga/$(BOARD)/blink_top.sv
+VERBS := test waves lint synth fpga prog
 TARGETS := help setup tools tools-prune selfcheck clean $(VERBS) \
     $(addsuffix -%,$(VERBS) check)
 
@@ -106,6 +115,13 @@ endif
 ifneq ($(filter waves,$(MAKECMDGOALS)),)
   ifeq ($(MODULES),)
     $(error Usage: make waves <module>. Testbenches found: $(or $(TESTS),(none)))
+  endif
+endif
+
+# The board holds one bitstream at a time, so prog takes exactly one design.
+ifneq ($(filter prog,$(MAKECMDGOALS)),)
+  ifneq ($(words $(MODULES)),1)
+    $(error Usage: make prog <design>. Designs found for $(BOARD): $(or $(DESIGNS),(none)))
   endif
 endif
 
@@ -148,6 +164,18 @@ ifneq ($(shell command -v ccache 2>/dev/null),)
   export CCACHE_MAXSIZE := 1G
 endif
 
+# FPGA board. The iCESugar-Pro has an LFE5U-25F, CABGA256 package, speed
+# grade 6. Another board needs its own fpga/<board>/ (tops and <board>.lpf)
+# and its own NEXTPNR_FLAGS.
+NEXTPNR_FLAGS := --25k --package CABGA256 --speed 6
+BOARD_LPF := fpga/$(BOARD)/$(BOARD).lpf
+FPGA_BUILD := build/fpga/$(BOARD)
+
+# The board's programmer (iCELink) shows up as a USB drive. The desktop mounts
+# it under /run/media/$USER (RHEL, Fedora) or /media/$USER (Ubuntu); to use
+# another place: make prog blink ICELINK=/mount/point
+ICELINK ?= $(firstword $(wildcard /run/media/$(USER)/iCELink /media/$(USER)/iCELink))
+
 # --x-initial unique only randomizes initial values if we ask for it at run
 # time. This helps find registers that depend on a power-up value.
 SIM_ARGS = +verilator+seed+$(SEED) +verilator+rand+reset+2
@@ -189,11 +217,19 @@ define require_rtl
 	fi
 endef
 
+# The same for the board top of design $*, used by fpga and prog.
+define require_top
+	@if [ -z "$(filter $*,$(DESIGNS))" ]; then \
+	    echo "ERROR: fpga/$(BOARD)/$*_top.sv does not exist or does not declare a module yet."; \
+	    exit 1; \
+	fi
+endef
+
 # ---------------------------------------------------------------------------
 # Targets
 # ---------------------------------------------------------------------------
 
-.PHONY: help setup tools tools-prune check-tools check-slang lint test selfcheck synth waves clean
+.PHONY: help setup tools tools-prune check-tools check-slang lint test selfcheck synth waves fpga prog clean
 
 help:
 	@echo "Targets:"
@@ -206,14 +242,17 @@ help:
 	@echo "  make selfcheck        confirms that a failing assert fails the test"
 	@echo "  make synth [module]   check synthesis (Yosys, synth_ecp5)"
 	@echo "  make waves <module>   runs one testbench, writes build/<module>.fst, opens Surfer"
+	@echo "  make fpga [design]    bitstream of fpga/$(BOARD)/<design>_top.sv, with a summary"
+	@echo "  make prog <design>    builds the design and programs the board (iCELink drive)"
 	@echo "  make clean            deletes build/"
 	@echo ""
-	@echo "lint, test, synth and waves accept several modules: make test a b"
+	@echo "lint, test, synth, waves and fpga accept several names: make test a b"
 	@echo "Tab completion for bash and fish: see scripts/completion/."
 	@echo ""
-	@echo "Variables: SEED=$(SEED) CXX=$(CXX) VIEWER=$(VIEWER)"
+	@echo "Variables: SEED=$(SEED) CXX=$(CXX) VIEWER=$(VIEWER) BOARD=$(BOARD)"
 	@echo "Modules found:     $(or $(RTL_MODS),(none))"
 	@echo "Testbenches found: $(or $(TESTS),(none))"
+	@echo "Designs found:     $(or $(DESIGNS),(none))"
 
 tools:
 	CXX="$(CXX)" bash scripts/setup-tools.sh
@@ -299,6 +338,41 @@ synth-%: check-slang
 	yosys -q $(SLANG_LOAD) -l build/synth/$*.log \
 	    -p "read_slang -DSYNTHESIS -I rtl -I rtl/pkg --top $* $(RTL_SRCS); synth_ecp5 -top $*; tee -o build/synth/$*.stat stat"
 	@echo "synth $*: ok (sv-elab $(SLANG_MODE); report in build/synth/$*.stat)"
+
+# --- FPGA -------------------------------------------------------------------
+
+fpga: $(addprefix fpga-,$(or $(MODULES),$(DESIGNS)))
+
+# Synthesis (Yosys), place & route (nextpnr) and bitstream (ecppack) of
+# fpga/$(BOARD)/$*_top.sv. --timing-allow-fail keeps nextpnr from stopping
+# on a timing failure, so the summary can show it; the summary then fails
+# and the bitstream is not generated.
+fpga-%: check-slang
+	$(require_top)
+	@mkdir -p $(FPGA_BUILD)
+	yosys -q $(SLANG_LOAD) -l $(FPGA_BUILD)/$*-synth.log \
+	    -p "read_slang -DSYNTHESIS -I rtl -I rtl/pkg --top $*_top $(RTL_SRCS) $(FPGA_COMMON_SRCS) fpga/$(BOARD)/$*_top.sv; synth_ecp5 -top $*_top -json $(FPGA_BUILD)/$*.json"
+	nextpnr-ecp5 -q $(NEXTPNR_FLAGS) --timing-allow-fail \
+	    --json $(FPGA_BUILD)/$*.json --lpf $(BOARD_LPF) \
+	    --textcfg $(FPGA_BUILD)/$*.config -l $(FPGA_BUILD)/$*-pnr.log
+	@bash scripts/fpga-summary.sh $(FPGA_BUILD)/$*-pnr.log "$* on $(BOARD)"
+	ecppack $(FPGA_BUILD)/$*.config $(FPGA_BUILD)/$*.bit
+	@echo "fpga $*: ok (bitstream in $(FPGA_BUILD)/$*.bit)"
+
+prog: $(addprefix prog-,$(MODULES))
+
+# Copying the .bit to the iCELink drive programs the board's flash. icesprog
+# does the same over USB, but /dev/hidraw* is root-only without a udev rule,
+# and the lab PC has no root.
+prog-%: fpga-%
+	@if [ -z "$(ICELINK)" ] || [ ! -d "$(ICELINK)" ]; then \
+	    echo "ERROR: iCELink drive not found in /run/media/$(USER) or /media/$(USER)."; \
+	    echo "Plug in the board, or give the mount point: make prog $* ICELINK=/path"; \
+	    exit 1; \
+	fi
+	cp $(FPGA_BUILD)/$*.bit "$(ICELINK)/"
+	sync
+	@echo "prog $*: copied to $(ICELINK); the board is programming itself"
 
 clean:
 	rm -rf build

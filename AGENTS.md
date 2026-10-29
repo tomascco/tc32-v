@@ -51,7 +51,10 @@ CI. Do not install tools through system packages or any other path. The host onl
 - `tc32v_` prefix on every module and package (`tc32v_alu`, `tc32v_pkg`), to avoid clashing
   with other IPs when the core is integrated into the chip. SV identifiers do not allow hyphens.
 - One module per file, file name = module name.
-- RTL never knows about board pins. Board tops live in `fpga/<board>/`.
+- RTL never knows about board pins. Board tops live in `fpga/<board>/<design>_top.sv`
+  (top `<design>_top`), with the pins in `fpga/<board>/<board>.lpf`. FPGA-only modules
+  shared by every board, such as the power-on reset `tc32v_power_on_reset`, live in
+  `fpga/common/`; they may rely on initial values, which `rtl/` may not.
 - SVA assertions may live in the RTL inside `` `ifndef SYNTHESIS ``, or in a separate
   module in `sva/` attached with `bind` (preferred).
 - All RTL must pass `make lint` (Verilator `-Wall`) and `make synth` with no new warnings.
@@ -80,6 +83,10 @@ CI. Do not install tools through system packages or any other path. The host onl
 - `make synth`: check synthesis with Yosys.
 - `make waves <module>`: runs with an FST dump and opens it in Surfer (`VIEWER=gtkwave` or
   `VIEWER=` to change or skip the viewer).
+- `make fpga [design]`: synthesis, place & route and bitstream for the board (`BOARD`,
+  default `icesugar-pro`), with a summary of max clock and utilization.
+- `make prog <design>`: builds the design and programs the board through the iCELink
+  USB drive. Never run it without the author asking.
 - `scripts/completion/`: tab completion for bash and fish (see `docs/environment.md`).
 - `SEED=N make test`: changes the seed.
 

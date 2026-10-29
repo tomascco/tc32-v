@@ -52,6 +52,9 @@ How `make tools` installs the tools, and which versions are pinned, is described
 | `make synth <module>` | checks synthesis of one module |
 | `make waves <module>` | runs the testbench, writes `build/<module>.fst` and opens it in Surfer |
 | `VIEWER=gtkwave make waves <module>` | opens GTKWave instead; `VIEWER=` only writes the file |
+| `make fpga` | builds the bitstream of every design in `fpga/icesugar-pro/` and prints a summary (max clock, utilization) |
+| `make fpga <design>` | builds one design, for example `make fpga blink` (top `fpga/icesugar-pro/blink_top.sv`) |
+| `make prog <design>` | builds the design and programs the board by copying the `.bit` to the iCELink USB drive (no root needed) |
 | `make clean` | deletes `build/` |
 | `SEED=N make test` | changes the seed of the random tests (default 1) |
 
