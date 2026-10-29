@@ -1,5 +1,6 @@
 # Bash tab completion for the TC32-V Makefile: `make test <TAB>` lists the
-# testbenches, `make lint <TAB>` the RTL modules.
+# testbenches, `make lint <TAB>` the RTL modules, `make fpga <TAB>` the FPGA
+# designs of the board.
 #
 # To enable it, add this line to ~/.bashrc (after bash-completion is loaded):
 #   source /path/to/tc32-v/scripts/completion/tc32v.bash
@@ -27,7 +28,7 @@ _tc32v_make() {
     # The last verb on the line decides what comes next.
     local word verb=
     for word in "${COMP_WORDS[@]:1:COMP_CWORD-1}"; do
-        case $word in test | waves | lint | synth) verb=$word ;; esac
+        case $word in test | waves | lint | synth | fpga | prog) verb=$word ;; esac
     done
 
     local candidates f
@@ -45,9 +46,15 @@ _tc32v_make() {
             candidates+=" ${f%.sv}"
         done
         ;;
+    fpga | prog)
+        for f in $(_tc32v_declared fpga/"${BOARD:-icesugar-pro}"/*_top.sv); do
+            f=${f##*/}
+            candidates+=" ${f%_top.sv}"
+        done
+        ;;
     *)
         # Keep in sync with `make help`.
-        candidates="help setup tools tools-prune lint test selfcheck synth waves clean"
+        candidates="help setup tools tools-prune lint test selfcheck synth waves fpga prog clean"
         ;;
     esac
 

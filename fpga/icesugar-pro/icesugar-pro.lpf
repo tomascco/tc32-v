@@ -1,0 +1,20 @@
+# iCESugar-Pro (LFE5U-25F, CABGA256): pinos da placa.
+#
+# Os nomes entre aspas são as portas do top da placa (fpga/icesugar-pro/*.sv).
+# SITE é a bola do encapsulamento; o comentário traz o pad do esquemático.
+# Constraints sem porta correspondente no top são ignoradas pelo nextpnr.
+#
+# Todos os bancos de I/O usam VCCIO = 3V3 (esquemático v1.3), daí LVCMOS33.
+
+# Clock: oscilador de 25 MHz (CLK_25MHz, pad PL47C).
+LOCATE COMP "clk" SITE "P6";
+IOBUF PORT "clk" IO_TYPE=LVCMOS33;
+FREQUENCY PORT "clk" 25 MHZ;
+
+# LED RGB (D3): anodo no pino, catodo no GND pelo resistor. Acende com 1.
+LOCATE COMP "led_r" SITE "B11";  # PT49A
+LOCATE COMP "led_g" SITE "A11";  # PT53A
+LOCATE COMP "led_b" SITE "A12";  # PT53B
+IOBUF PORT "led_r" IO_TYPE=LVCMOS33;
+IOBUF PORT "led_g" IO_TYPE=LVCMOS33;
+IOBUF PORT "led_b" IO_TYPE=LVCMOS33;
