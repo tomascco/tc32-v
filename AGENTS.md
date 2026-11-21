@@ -104,7 +104,9 @@ CI. Do not install tools through system packages or any other path. The host onl
 - `make debug [module]`: lint, synth, schematic and a single simulation with waves and
   coverage; the waves are kept even when the test fails.
 - `make fpga [design]`: synthesis, place & route and bitstream for the board (`BOARD`,
-  default `icesugar-pro`), with a summary of max clock and utilization.
+  default `icesugar-pro`), with a summary of max clock, slack, critical path and
+  utilization. The full post-route timing report goes to
+  `build/fpga/<board>/<design>-timing.rpt`.
 - `make prog <design>`: builds the design and programs the board through the iCELink
   USB drive. Never run it without the author asking.
 - `scripts/completion/`: tab completion for bash and fish (see `docs/environment.md`).

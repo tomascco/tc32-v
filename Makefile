@@ -559,7 +559,8 @@ fpga: $(addprefix fpga-,$(or $(MODULES),$(DESIGNS)))
 # Synthesis (Yosys), place & route (nextpnr) and bitstream (ecppack) of
 # fpga/$(BOARD)/$*_top.sv. --timing-allow-fail keeps nextpnr from stopping
 # on a timing failure, so the summary can show it; the summary then fails
-# and the bitstream is not generated.
+# and the bitstream is not generated. The timing report (<design>-timing.rpt)
+# is written before the summary, so it exists even when timing fails.
 fpga-%: check-slang
 	$(require_top)
 	@mkdir -p $(FPGA_BUILD)
@@ -568,7 +569,10 @@ fpga-%: check-slang
 	$(Q)nextpnr-ecp5 -q $(NEXTPNR_FLAGS) --timing-allow-fail \
 	    --json $(FPGA_BUILD)/$*.json --lpf $(BOARD_LPF) \
 	    --textcfg $(FPGA_BUILD)/$*.config -l $(FPGA_BUILD)/$*-pnr.log
-	@bash scripts/fpga-summary.sh $(FPGA_BUILD)/$*-pnr.log "$* on $(BOARD)"
+	@awk -v title="$* on $(BOARD)" -f scripts/fpga-timing-report.awk \
+	    $(FPGA_BUILD)/$*-pnr.log > $(FPGA_BUILD)/$*-timing.rpt
+	@bash scripts/fpga-summary.sh $(FPGA_BUILD)/$*-pnr.log "$* on $(BOARD)" \
+	    $(FPGA_BUILD)/$*-timing.rpt
 	$(Q)ecppack $(FPGA_BUILD)/$*.config $(FPGA_BUILD)/$*.bit
 	@echo "fpga $*: ok (bitstream in $(FPGA_BUILD)/$*.bit)"
 

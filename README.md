@@ -55,7 +55,7 @@ How `make tools` installs the tools, and which versions are pinned, is described
 | `make coverage [module]` | runs with functional coverage and prints the covergroup report (`build/<module>-coverage/report.txt`) |
 | `make schematic [module]` | interactive RTL schematic (ossschem) in `build/<module>-schematic/`, opened in the browser when the module is named |
 | `make debug [module]` | lint, synth, schematic and one simulation with waves and coverage; the waves are kept even if the test fails |
-| `make fpga` | builds the bitstream of every design in `fpga/icesugar-pro/` and prints a summary (max clock, utilization) |
+| `make fpga` | builds the bitstream of every design in `fpga/icesugar-pro/` and prints a summary (max clock, slack, critical path, utilization); full timing report in `build/fpga/icesugar-pro/<design>-timing.rpt` |
 | `make fpga <design>` | builds one design, for example `make fpga blink` (top `fpga/icesugar-pro/blink_top.sv`) |
 | `make prog <design>` | builds the design and programs the board by copying the `.bit` to the iCELink USB drive (no root needed) |
 | `make clean` | deletes `build/` |
