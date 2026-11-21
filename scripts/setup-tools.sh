@@ -10,6 +10,7 @@
 #               repository, ignored by git)
 #   CXX         C++ compiler used by Verilator (default: g++)
 #   TGZ         path to an already downloaded .tgz (offline install)
+#   OSSSCHEM_TGZ  the same for the ossschem tarball
 #
 # The install is atomic: everything happens in a temporary directory inside
 # TOOLS_ROOT, and only at the end is it renamed to oss-cad-suite-<date>. If the
@@ -19,6 +20,9 @@
 # everything, just delete the .tools/ directory.
 #
 # Old versions are not deleted here. Use `make tools-prune`.
+#
+# It also installs ossschem (version in tools.lock) in
+# TOOLS_ROOT/ossschem-<version>/.
 
 set -euo pipefail
 
@@ -311,11 +315,63 @@ install_lz4() {
 }
 
 # ---------------------------------------------------------------------------
+# ossschem (RTL schematic, for make schematic and make debug)
+# ---------------------------------------------------------------------------
+
+# The ossschem linux-x64 release is self-contained: the command, the viewer
+# (an HTML page) and its own Node in runtime/. We install it in
+# .tools/ossschem-<version>/, and the Makefile puts its bin/ on the PATH.
+# bin/ossschem finds the rest relative to itself, so nothing lands outside
+# the repository (not even a link in ~/.local/bin).
+install_ossschem() {
+    local dir="$TOOLS_ROOT/ossschem-$OSSSCHEM_VERSION"
+    local name="ossschem-$OSSSCHEM_VERSION-linux-x64"
+    local url="https://github.com/markusdd/ossschem/releases/download/v$OSSSCHEM_VERSION/$name.tar.gz"
+    local tgz="${OSSSCHEM_TGZ:-}" tmp actual
+
+    if [ -x "$dir/bin/ossschem" ]; then
+        info "ossschem:  $OSSSCHEM_VERSION already installed in $dir"
+        return
+    fi
+
+    # Same atomic scheme as the OSS CAD Suite. OSSSCHEM_TMP is global so the
+    # EXIT trap can see it.
+    mkdir -p "$TOOLS_ROOT"
+    OSSSCHEM_TMP="$(mktemp -d "$TOOLS_ROOT/.ossschem-$OSSSCHEM_VERSION.tmp.XXXXXX")"
+    tmp="$OSSSCHEM_TMP"
+    trap 'rm -rf -- "$OSSSCHEM_TMP"' EXIT
+
+    if [ -n "$tgz" ]; then
+        [ -f "$tgz" ] || die "OSSSCHEM_TGZ=$tgz does not exist."
+        info "ossschem:  using local file $tgz"
+    else
+        tgz="$tmp/$name.tar.gz"
+        info "ossschem:  downloading $url"
+        download "$url" "$tgz" ||
+            die "ossschem download failed. No access to GitHub? Download it on another machine and use OSSSCHEM_TGZ=/path/$name.tar.gz"
+    fi
+    actual="$(sha256sum "$tgz" | awk '{ print $1 }')"
+    [ "$actual" = "$OSSSCHEM_SHA256" ] ||
+        die "ossschem SHA-256 mismatch.
+  expected (tools.lock): $OSSSCHEM_SHA256
+  got:                   $actual"
+    tar -xzf "$tgz" -C "$tmp"
+
+    "$tmp/$name/bin/ossschem" --help >/dev/null 2>&1 ||
+        die "the extracted ossschem does not run ($tmp/$name/bin/ossschem --help)."
+    mv -T -- "$tmp/$name" "$dir"
+    rm -rf -- "$tmp"
+    trap - EXIT
+    info "ossschem:  $OSSSCHEM_VERSION installed in $dir"
+}
+
+# ---------------------------------------------------------------------------
 # Main program
 # ---------------------------------------------------------------------------
 
 check_host
 install_lz4
+install_ossschem
 
 if [ -d "$FINAL_DIR" ]; then
     info "OSS CAD Suite $DATE already installed in $FINAL_DIR"
