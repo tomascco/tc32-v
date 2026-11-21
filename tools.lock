@@ -16,3 +16,14 @@ OSS_CAD_SUITE_SHA256=8b9975b9a7b4336ab4fce180328ecc38313aa8c96fedb8d399edbbf7984
 # a local liblz4.a in .tools/lz4-<version>/.
 LZ4_VERSION=1.10.0
 LZ4_SHA256=537512904744b35e232912055ccf8ec66d768639ff3abe5788d90d792ec5f48b
+
+# ossschem (https://github.com/markusdd/ossschem): interactive RTL schematic
+# for `make schematic` and `make debug`. The linux-x64 tarball ships its own
+# Node, so the host needs nothing beyond what it already needs. It reads the
+# `--json-only` output of the OSS CAD Suite Verilator above, whose format
+# changes between versions: when changing either one, check `make schematic`
+# again.
+# To update: change the version, download ossschem-<version>-linux-x64.tar.gz
+# from the release, run `sha256sum` on it and write the result below.
+OSSSCHEM_VERSION=0.9.0
+OSSSCHEM_SHA256=73fa869ad796d0d444405e3f7cabe0629d0fcc5230511a1a4044b0c718101f25
