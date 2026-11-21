@@ -33,6 +33,9 @@ CI. Do not install tools through system packages or any other path. The host onl
   check that the RTL is synthesizable (`synth_ecp5`, target LFE5U-25F) and as a second lint,
   for its better error messages. It is built in from Yosys 0.67 on; in earlier versions,
   load the plugin with `yosys -m slang`. Do not use `read_verilog -sv` for the RTL.
+- **ossschem** (version in `tools.lock`, also installed by `make tools` into `.tools/`):
+  interactive RTL schematic from `verilator --json-only`, for `make schematic` and
+  `make debug`. Ships its own Node.
 - **Do not use cocotb or Python** for tests. Testbenches are written in SystemVerilog.
 - xsim (Vivado) is used manually by the author as a second opinion; do not integrate it into CI.
 
@@ -50,19 +53,31 @@ CI. Do not install tools through system packages or any other path. The host onl
 - Synchronous, active-high reset, signal `rst`; clock `clk`.
 - `tc32v_` prefix on every module and package (`tc32v_alu`, `tc32v_pkg`), to avoid clashing
   with other IPs when the core is integrated into the chip. SV identifiers do not allow hyphens.
-- One module per file, file name = module name.
+- One module per file, file name = module name. Packages go in `rtl/pkg/`.
+- `rtl/`, `tb/` and `sva/` accept subfolders (`rtl/core/tc32v_alu.sv`). The folder is not
+  part of the name the commands use (`make test tc32v_alu`), so a file name cannot repeat
+  across folders (the Makefile stops with an error).
 - RTL never knows about board pins. Board tops live in `fpga/<board>/<design>_top.sv`
   (top `<design>_top`), with the pins in `fpga/<board>/<board>.lpf`. FPGA-only modules
   shared by every board, such as the power-on reset `tc32v_power_on_reset`, live in
   `fpga/common/`; they may rely on initial values, which `rtl/` may not.
 - SVA assertions may live in the RTL inside `` `ifndef SYNTHESIS ``, or in a separate
-  module in `sva/` attached with `bind` (preferred).
+  module `sva/<module>_sva.sv` attached with `bind` (preferred; template:
+  `sva/tc32v_counter_sva.sv`). The Makefile compiles `sva/` in the Verilator lint and in
+  the tests, never in Yosys.
 - All RTL must pass `make lint` (Verilator `-Wall`) and `make synth` with no new warnings.
 
 ## Testbench rules (`tb/`)
 
 - One testbench per module: `tb/<module>_tb.sv`, top module `<module>_tb`
-  (for example `tb/tc32v_alu_tb.sv`, module `tc32v_alu_tb`).
+  (for example `tb/tc32v_alu_tb.sv`, module `tc32v_alu_tb`). The template is
+  `tb/tc32v_counter_tb.sv`. Like the RTL, a testbench may live in a subfolder.
+- Testbench helper code (a reference model as a class, for example) goes in a `.svh` next
+  to it and comes in with `` `include "<name>.svh" `` at the top of the testbench, outside
+  the `module`, with an include guard (`` `ifndef ``/`` `define ``). The Makefile compiles
+  only the `_tb.sv`, but puts its folder on `-I`.
+- Testbenches write waves only when given `+dumpfile=<file>` (read with `$value$plusargs`;
+  `make waves` and `make debug` pass it).
 - Checks use `assert (cond) else $fatal(1, "message with expected/actual values");`.
 - Success ends with `$display("PASS");` followed by `$finish;`. The simulator's exit code
   is the CI verdict.
@@ -74,21 +89,29 @@ CI. Do not install tools through system packages or any other path. The host onl
 - `make setup`: full setup to start coding (`make tools`, `make lint` and
   `make test`).
 - `make tools`: installs the tools pinned in `tools.lock` (first time only).
-- `make tools-prune`: deletes, after confirmation, OSS CAD Suite versions other than the one
-  in `tools.lock`. Never run it automatically.
+- `make tools-prune`: deletes, after confirmation, OSS CAD Suite and ossschem versions other
+  than the ones in `tools.lock`. Never run it automatically.
 - `make lint`: lints all RTL (Verilator `-Wall` and elaboration with sv-elab).
 - `make test`: runs every testbench.
-- `make test <module>`: runs one testbench (`lint`, `synth` and `waves` also take modules;
-  several are allowed).
+- `make test <module>`: runs one testbench (every target that takes names also takes
+  several, except `prog`).
 - `make synth`: check synthesis with Yosys.
 - `make waves <module>`: runs with an FST dump and opens it in Surfer (`VIEWER=gtkwave` or
   `VIEWER=` to change or skip the viewer).
+- `make coverage [module]`: runs with `--coverage-user` and prints the covergroup report.
+- `make schematic [module]`: RTL schematic (ossschem) in `build/<module>-schematic/`, opened
+  in the browser when the module is named.
+- `make debug [module]`: lint, synth, schematic and a single simulation with waves and
+  coverage; the waves are kept even when the test fails.
 - `make fpga [design]`: synthesis, place & route and bitstream for the board (`BOARD`,
   default `icesugar-pro`), with a summary of max clock and utilization.
 - `make prog <design>`: builds the design and programs the board through the iCELink
   USB drive. Never run it without the author asking.
 - `scripts/completion/`: tab completion for bash and fish (see `docs/environment.md`).
-- `SEED=N make test`: changes the seed.
+- `SEED=N make test`: fixes the seed. Without it, every `make` draws one, prints it, and a
+  failing test prints the command that reproduces it.
+- `PLUSARGS="+name=value" make test <module>`: passes plusargs to the testbench.
+- `V=1`: shows the full tool commands (hidden by default).
 
 <!-- ai-memory:start -->
 ## Long-term memory (ai-memory)
