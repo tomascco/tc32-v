@@ -134,9 +134,9 @@ time: each one answers only inside its own checkout (it checks the first line of
 
 - **bash**: works in any order of `source` lines.
 - **fish**: fish loads only the first `make.fish` in `fish_complete_path`. This one loads
-  the next `make.fish` in the path before adding its own, so it must come **first**: its
-  `set -p` line goes **last** in `config.fish`. A repository whose `make.fish` does not
-  chain this way hides every other one that comes after it.
+  the next `make.fish` in the path before adding its own, so any order works as long as
+  every `make.fish` in the path chains the same way. One that
+  does not chain hides every other one that comes after it.
 
 ## Testbenches
 
